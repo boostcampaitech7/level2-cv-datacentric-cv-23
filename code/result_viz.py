@@ -1,14 +1,13 @@
 import os
+import argparse
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import json
 from PIL import Image, ImageOps
-from typing import Union
 from pathlib import Path
 from deteval import calc_deteval_metrics
-import argparse
 from io import BytesIO
 
 def parse_args():
@@ -113,7 +112,10 @@ def main(opt):
 
     # 두 개의 열 생성
     col1, col2 = st.columns(2)
-    with col1:
+
+    with col2:
+        for _ in range(2):
+            st.write('\n')
         # 이미지 탐색 버튼
         search = st.columns(8)
         with search[0]:
@@ -124,18 +126,16 @@ def main(opt):
             if st.button("Next"):
                 if st.session_state.image_index < len(image_files) - 1:
                     st.session_state.image_index += 1
-
-        # Streamlit sidebar: 이미지 선택
+    with col1:
+        # 이미지 선택 sidebar
         selected_image = st.selectbox("이미지를 선택하세요:", image_files, index=st.session_state.image_index)
         if image_files.index(selected_image) != st.session_state.image_index:
             st.session_state.image_index = image_files.index(selected_image)
             st.rerun()
-
+        # unmatched box 이미지 출력
         buf, score_dict, unmatched_len = unmatched_show(opt, det_data, selected_image)
         st.image(buf, width=450)
     with col2:
-        for i in range(8):
-            st.write('\n')
         st.header('Statistics')
         st.markdown(f"##### Unmatched gt : {unmatched_len[0]}, Unmatched det : {unmatched_len[1]}")
         df = pd.DataFrame({"name": score_dict.keys(),"score": score_dict.values()}).set_index('name')
