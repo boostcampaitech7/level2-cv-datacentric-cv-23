@@ -60,9 +60,9 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
     run = wandb.init(
     project="lv2-OCR",
     entity="cv23-lv2-ocr",
-    name="baseline",
-    notes="baseline first experiment",
-    tags=["baseline"],
+    name="baseline_added_validation",
+    notes="baseline experiment with validation",
+    tags=["baseline", "validation meteric"],
     config=wandb_config,
     )
     
@@ -125,7 +125,7 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                 
                 # wandb log batch metrics
                 wandb.log({
-                    'batch_loss': loss_val,
+                    'train/batch_loss': loss_val,
                 })
 
                 pbar.update(1)
@@ -145,10 +145,10 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
         
         wandb.log({
             'epoch': epoch + 1,
-            'epoch_loss': mean_epoch_loss,
-            'epoch_cls_loss': mean_cls_loss,
-            'epoch_angle_loss': mean_angle_loss,
-            'epoch_iou_loss': mean_iou_loss,
+            'train/total_loss': mean_epoch_loss,
+            'train/cls_loss': mean_cls_loss,
+            'train/angle_loss': mean_angle_loss,
+            'train/iou_loss': mean_iou_loss,
             'elapsed_time': time.time() - epoch_start
         })
 
@@ -178,6 +178,15 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                     f'Angle Loss: {mean_val_loss[2]:.4f}, '
                     f'IoU Loss: {mean_val_loss[3]:.4f}'
                 )
+                
+                wandb.log({
+                    'epoch': epoch + 1,
+                    'val/total_loss': mean_val_loss[0],
+                    'val/cls_loss': mean_val_loss[1],
+                    'val/angle_loss': mean_val_loss[2],
+                    'val/iou_loss': mean_val_loss[3],
+                })
+                
                 model.train()
 
         if (epoch + 1) % save_interval == 0:
