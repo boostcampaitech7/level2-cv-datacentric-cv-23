@@ -13,6 +13,8 @@ from tqdm import tqdm
 from detect import detect
 from deteval import calc_deteval_metrics
 
+import pandas as pd
+
 
 CHECKPOINT_EXTENSIONS = ['.pth', '.ckpt']
 LANGUAGE_LIST = ['chinese', 'japanese', 'thai', 'vietnamese']
@@ -92,6 +94,89 @@ def extract_bboxes_dict(json_data):
         bboxes_dict[image_id] = bboxes
     return bboxes_dict
 
+def get_language_json_path(image_name):
+    """이미지 이름에 따른 언어별 JSON 파일 경로 반환"""
+    base_path = args.data_dir
+    if 'zh' in image_name:
+        return os.path.join(base_path, 'chinese_receipt/ufo/val_random.json')
+    elif 'ja' in image_name:
+        return os.path.join(base_path, 'japanese_receipt/ufo/val_random.json')
+    elif 'th' in image_name:
+        return os.path.join(base_path, 'thai_receipt/ufo/val_random.json')
+    elif 'vi' in image_name:
+        return os.path.join(base_path, 'vietnamese_receipt/ufo/val_random.json')
+    return None
+
+def process_data(output_path):
+    """output.csv와 train.json 파일들을 처리하여 평가 결과 반환"""
+    with open(output_path, 'r', encoding='utf-8') as f:
+        output_data = json.load(f)
+    
+    results = []
+    for image_name, image_data in output_data['images'].items():
+        # 언어 식별
+        lang_code = None
+        if 'zh' in image_name:
+            lang_code = '중국어'
+        elif 'ja' in image_name:
+            lang_code = '일본어'
+        elif 'th' in image_name:
+            lang_code = '태국어'
+        elif 'vi' in image_name:
+            lang_code = '베트남어'
+        
+        if lang_code:
+            # GT JSON 파일 읽기
+            gt_json_path = get_language_json_path(image_name)
+            if gt_json_path and os.path.exists(gt_json_path):
+                with open(gt_json_path, 'r', encoding='utf-8') as f:
+                    gt_data = json.load(f)
+                
+                # 예측 bbox와 GT bbox 추출
+                pred_bboxes = []
+                for word in image_data.get('words', {}).values():
+                    points = word.get('points', [])
+                    if points:
+                        pred_bboxes.append(points)
+                
+                gt_bboxes = []
+                if image_name in gt_data['images']:
+                    for word in gt_data['images'][image_name].get('words', {}).values():
+                        points = word.get('points', [])
+                        if points:
+                            gt_bboxes.append(points)
+                
+                # DetEval 메트릭 계산
+                eval_result = calc_deteval_metrics(
+                    {image_name: pred_bboxes},
+                    {image_name: gt_bboxes}
+                )
+                
+                results.append({
+                    'language': lang_code,
+                    'precision': eval_result['total']['precision'],
+                    'recall': eval_result['total']['recall'],
+                    'hmean': eval_result['total']['hmean']
+                })
+    
+    return pd.DataFrame(results)
+
+def calculate_language_scores(df):
+    """언어별 평균 점수 계산"""
+    languages = ['중국어', '일본어', '태국어', '베트남어']
+    metrics = ['precision', 'recall', 'hmean']
+    
+    results = {}
+    
+    for lang in languages:
+        scores = {}
+        mask = (df['language'] == lang)
+        for metric in metrics:
+            score = df[mask][metric].mean()
+            scores[metric] = round(float(score), 4) if not pd.isna(score) else 0.0
+        results[lang] = scores
+    
+    return results
 def main(args):
     # Initialize model
     model = EAST(pretrained=False).to(args.device)
@@ -121,6 +206,17 @@ def main(args):
     print("Overall Precision:", results['total']['precision'])
     print("Overall Recall:", results['total']['recall'])
     print("Overall Hmean:", results['total']['hmean'])
+
+    # 언어별 평가 결과 계산
+    output_df = process_data(osp.join(args.output_dir, output_fname))
+    scores = calculate_language_scores(output_df)
+
+    # 결과 출력
+    for language, metrics in scores.items():
+        print(f"\n{language} 평가 결과:")
+        print(f"  Precision: {metrics['precision']:.4f}")
+        print(f"  Recall: {metrics['recall']:.4f}")
+        print(f"  F1-score: {metrics['hmean']:.4f}")
 
 if __name__ == '__main__':
     args = parse_args()

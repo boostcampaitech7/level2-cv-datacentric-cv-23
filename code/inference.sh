@@ -1,4 +1,4 @@
-data_dir='/data/ephemeral/home/code_seyeon/data'
+data_dir='/data/ephemeral/home/c/data'
 model_dir='/data/ephemeral/home/code_seyeon/pths'
 output_dir='/data/ephemeral/home/code_seyeon/data'
 json_name='val_random' # 추론하고 싶은 json 파일의 이름을 적어주세요
