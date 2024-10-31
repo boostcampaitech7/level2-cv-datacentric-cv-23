@@ -79,7 +79,6 @@ def shrink_poly(vertices, coef=0.3):
     v = move_points(v, 3 + offset, 4 + offset, r, coef)
     return v
 
-
 @njit
 def get_rotate_mat(theta):
     '''positive theta value means rotate clockwise'''
@@ -102,7 +101,6 @@ def rotate_vertices(vertices, theta, anchor=None):
     res = np.dot(rotate_mat, v - anchor)
     return (res + anchor).T.reshape(-1)
 
-
 @njit
 def get_boundary(vertices):
     '''get the tight boundary around given vertices
@@ -118,7 +116,6 @@ def get_boundary(vertices):
     y_max = max(y1, y2, y3, y4)
     return x_min, x_max, y_min, y_max
 
-
 @njit
 def cal_error(vertices):
     '''default orientation is x1y1 : left-top, x2y2 : right-top, x3y3 : right-bot, x4y4 : left-bot
@@ -133,7 +130,6 @@ def cal_error(vertices):
     err = cal_distance(x1, y1, x_min, y_min) + cal_distance(x2, y2, x_max, y_min) + \
           cal_distance(x3, y3, x_max, y_max) + cal_distance(x4, y4, x_min, y_max)
     return err
-
 
 @njit
 def find_min_rect_angle(vertices):
@@ -234,7 +230,6 @@ def crop_img(img, vertices, labels, length):
     new_vertices[:,[0,2,4,6]] -= start_w
     new_vertices[:,[1,3,5,7]] -= start_h
     return region, new_vertices
-
 
 @njit
 def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):

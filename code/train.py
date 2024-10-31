@@ -15,6 +15,8 @@ from east_dataset import EASTDataset
 from dataset import SceneTextDataset
 from model import EAST
 
+import wandb
+
 
 def parse_args():
     parser = ArgumentParser()
@@ -45,6 +47,25 @@ def parse_args():
 
 def do_training(data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
                 learning_rate, max_epoch, save_interval):
+    
+    # wandb config 
+    wandb_config = {
+        'learning_rate': learning_rate,
+        'max_epoch' : max_epoch,
+        'batch_size' : batch_size,
+        'image_size' : image_size,
+    }
+    
+    # wandb run : name, notes, tags -> 실험 시 수정 
+    run = wandb.init(
+    project="lv2-OCR",
+    entity="cv23-lv2-ocr",
+    name="baseline",
+    notes="baseline first experiment",
+    tags=["baseline"],
+    config=wandb_config,
+    )
+    
     dataset = SceneTextDataset(
         data_dir,
         split='train',
@@ -69,6 +90,8 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
     model.train()
     for epoch in range(max_epoch):
         epoch_loss, epoch_start = 0, time.time()
+        cls_loss_sum, angle_loss_sum, iou_loss_sum = 0, 0, 0
+        
         with tqdm(total=num_batches) as pbar:
             for img, gt_score_map, gt_geo_map, roi_mask in train_loader:
                 pbar.set_description('[Epoch {}]'.format(epoch + 1))
@@ -80,6 +103,15 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
 
                 loss_val = loss.item()
                 epoch_loss += loss_val
+                
+                cls_loss_sum += extra_info['cls_loss']
+                angle_loss_sum += extra_info['angle_loss']
+                iou_loss_sum += extra_info['iou_loss']
+                
+                # wandb log batch metrics
+                wandb.log({
+                    'batch_loss': loss_val,
+                })
 
                 pbar.update(1)
                 val_dict = {
@@ -89,9 +121,24 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                 pbar.set_postfix(val_dict)
 
         scheduler.step()
+        
+        # wandb log epoch metrics
+        mean_epoch_loss = epoch_loss / num_batches
+        mean_cls_loss = cls_loss_sum / num_batches
+        mean_angle_loss = angle_loss_sum / num_batches
+        mean_iou_loss = iou_loss_sum / num_batches
+        
+        wandb.log({
+            'epoch': epoch + 1,
+            'epoch_loss': mean_epoch_loss,
+            'epoch_cls_loss': mean_cls_loss,
+            'epoch_angle_loss': mean_angle_loss,
+            'epoch_iou_loss': mean_iou_loss,
+            'elapsed_time': time.time() - epoch_start
+        })
 
         print('Mean loss: {:.4f} | Elapsed time: {}'.format(
-            epoch_loss / num_batches, timedelta(seconds=time.time() - epoch_start)))
+            mean_epoch_loss, timedelta(seconds=time.time() - epoch_start)))
 
         if (epoch + 1) % save_interval == 0:
             if not osp.exists(model_dir):
@@ -99,6 +146,11 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
 
             ckpt_fpath = osp.join(model_dir, 'latest.pth')
             torch.save(model.state_dict(), ckpt_fpath)
+            
+            # wandb : log model checkpoint 
+            wandb.save(ckpt_fpath)
+            
+    wandb.finish()
 
 
 def main(args):
