@@ -9,13 +9,14 @@ import cv2
 import albumentations as A
 from torch.utils.data import Dataset
 from shapely.geometry import Polygon
+from numba import njit
 
-
+@njit
 def cal_distance(x1, y1, x2, y2):
     '''calculate the Euclidean distance'''
     return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
-
+@njit
 def move_points(vertices, index1, index2, r, coef):
     '''move the two points to shrink edge
     Input:
@@ -48,7 +49,7 @@ def move_points(vertices, index1, index2, r, coef):
         vertices[y2_index] += ratio * length_y
     return vertices
 
-
+@njit
 def shrink_poly(vertices, coef=0.3):
     '''shrink the text region
     Input:
@@ -79,6 +80,7 @@ def shrink_poly(vertices, coef=0.3):
     return v
 
 
+@njit
 def get_rotate_mat(theta):
     '''positive theta value means rotate clockwise'''
     return np.array([[math.cos(theta), -math.sin(theta)], [math.sin(theta), math.cos(theta)]])
@@ -101,6 +103,7 @@ def rotate_vertices(vertices, theta, anchor=None):
     return (res + anchor).T.reshape(-1)
 
 
+@njit
 def get_boundary(vertices):
     '''get the tight boundary around given vertices
     Input:
@@ -116,6 +119,7 @@ def get_boundary(vertices):
     return x_min, x_max, y_min, y_max
 
 
+@njit
 def cal_error(vertices):
     '''default orientation is x1y1 : left-top, x2y2 : right-top, x3y3 : right-bot, x4y4 : left-bot
     calculate the difference between the vertices orientation and default orientation
@@ -131,6 +135,7 @@ def cal_error(vertices):
     return err
 
 
+@njit
 def find_min_rect_angle(vertices):
     '''find the best angle to rotate poly and obtain min rectangle
     Input:
@@ -231,6 +236,7 @@ def crop_img(img, vertices, labels, length):
     return region, new_vertices
 
 
+@njit
 def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
     '''get rotated locations of all pixels for next stages
     Input:
