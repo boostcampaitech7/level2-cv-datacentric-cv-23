@@ -108,7 +108,7 @@ def get_language_json_path(image_name):
     return None
 
 def process_data(output_path):
-    """output.csv와 train.json 파일들을 처리하여 평가 결과 반환"""
+    """output.csv와 train.json 파일들을 처리하여 태그별 평가 결과 반환"""
     with open(output_path, 'r', encoding='utf-8') as f:
         output_data = json.load(f)
     
@@ -117,13 +117,13 @@ def process_data(output_path):
         # 언어 식별
         lang_code = None
         if 'zh' in image_name:
-            lang_code = '중국어'
+            lang_code = 'chinese'
         elif 'ja' in image_name:
-            lang_code = '일본어'
+            lang_code = 'japanese'
         elif 'th' in image_name:
-            lang_code = '태국어'
+            lang_code = 'thai'
         elif 'vi' in image_name:
-            lang_code = '베트남어'
+            lang_code = 'vietnamese'
         
         if lang_code:
             # GT JSON 파일 읽기
@@ -132,51 +132,64 @@ def process_data(output_path):
                 with open(gt_json_path, 'r', encoding='utf-8') as f:
                     gt_data = json.load(f)
                 
-                # 예측 bbox와 GT bbox 추출
+                # 이미지별 태그 기준으로 bbox 분류
+                gt_tags_bbox = {}
+                if image_name in gt_data['images']:
+                    image_tags = gt_data['images'][image_name].get('tags', [])
+                    if image_tags:
+                        main_tag = image_tags[0]  # 첫 번째 태그 사용
+                        
+                        # 해당 이미지의 모든 bbox를 메인 태그로 분류
+                        gt_boxes = []
+                        for word in gt_data['images'][image_name].get('words', {}).values():
+                            points = word.get('points', [])
+                            if points:
+                                gt_boxes.append(points)
+                        
+                        if gt_boxes:
+                            gt_tags_bbox[main_tag] = gt_boxes
+                
+                # 예측된 bbox
                 pred_bboxes = []
                 for word in image_data.get('words', {}).values():
                     points = word.get('points', [])
                     if points:
                         pred_bboxes.append(points)
                 
-                gt_bboxes = []
-                if image_name in gt_data['images']:
-                    for word in gt_data['images'][image_name].get('words', {}).values():
-                        points = word.get('points', [])
-                        if points:
-                            gt_bboxes.append(points)
-                
-                # DetEval 메트릭 계산
-                eval_result = calc_deteval_metrics(
-                    {image_name: pred_bboxes},
-                    {image_name: gt_bboxes}
-                )
-                
-                results.append({
-                    'language': lang_code,
-                    'precision': eval_result['total']['precision'],
-                    'recall': eval_result['total']['recall'],
-                    'hmean': eval_result['total']['hmean']
-                })
+                # 태그별로 평가 수행
+                for tag, gt_boxes in gt_tags_bbox.items():
+                    # DetEval 메트릭 계산
+                    eval_result = calc_deteval_metrics(
+                        {image_name: pred_bboxes},
+                        {image_name: gt_boxes}
+                    )
+                    
+                    results.append({
+                        'language': lang_code,
+                        'tag': tag,
+                        'precision': eval_result['total']['precision'],
+                        'recall': eval_result['total']['recall'],
+                        'hmean': eval_result['total']['hmean']
+                    })
     
     return pd.DataFrame(results)
 
-def calculate_language_scores(df):
-    """언어별 평균 점수 계산"""
-    languages = ['중국어', '일본어', '태국어', '베트남어']
+def calculate_tag_scores(df):
+    """태그별 평균 점수 계산"""
     metrics = ['precision', 'recall', 'hmean']
-    
     results = {}
     
-    for lang in languages:
-        scores = {}
-        mask = (df['language'] == lang)
+    # 모든 태그에 대해 평균 계산
+    for tag in df['tag'].unique():
+        tag_mask = (df['tag'] == tag)
+        tag_scores = {}
         for metric in metrics:
-            score = df[mask][metric].mean()
-            scores[metric] = round(float(score), 4) if not pd.isna(score) else 0.0
-        results[lang] = scores
-    
+            score = df[tag_mask][metric].mean()
+            tag_scores[metric] = round(float(score), 4) if not pd.isna(score) else 0.0
+        results[tag] = tag_scores
+            
     return results
+
 def main(args):
     # Initialize model
     model = EAST(pretrained=False).to(args.device)
@@ -207,16 +220,17 @@ def main(args):
     print("Overall Recall:", results['total']['recall'])
     print("Overall Hmean:", results['total']['hmean'])
 
-    # 언어별 평가 결과 계산
+    # 태그별 평가 결과 계산
     output_df = process_data(osp.join(args.output_dir, output_fname))
-    scores = calculate_language_scores(output_df)
+    scores = calculate_tag_scores(output_df)
 
     # 결과 출력
-    for language, metrics in scores.items():
-        print(f"\n{language} 평가 결과:")
+    for tag, metrics in scores.items():
+        print(f"\n{tag} 평가 결과:")
         print(f"  Precision: {metrics['precision']:.4f}")
         print(f"  Recall: {metrics['recall']:.4f}")
         print(f"  F1-score: {metrics['hmean']:.4f}")
+
 
 if __name__ == '__main__':
     args = parse_args()
