@@ -2,9 +2,10 @@ import os
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import json
 from PIL import Image, ImageOps
 from typing import Union
-import json
 from pathlib import Path
 from deteval import calc_deteval_metrics
 import argparse
@@ -61,6 +62,9 @@ def unmatched_show(opt, det_data, selected_image: 'str'):
 
     # deteval 계산
     resdict = calc_deteval_metrics(pred_bboxes_dict, gt_bboxes_dict)
+
+    score_dict = {score: resdict['per_sample'][name][score] for score in ['precision', 'recall', 'hmean']}
+
     pairs = resdict['per_sample'][name]['pairs']
     
     gt_matched, det_matched = get_matched(pairs)
@@ -68,6 +72,7 @@ def unmatched_show(opt, det_data, selected_image: 'str'):
     # 매칭되지 않은 GT와 Pred bounding box 추출
     gt_unmatched = [gt_bboxes_dict[name][i] for i in range(len(gt_bboxes_dict[name])) if i not in gt_matched]
     det_unmatched = [pred_bboxes_dict[name][i] for i in range(len(pred_bboxes_dict[name])) if i not in det_matched]
+    unmatched_len = [len(gt_unmatched), len(det_unmatched)]
 
     # 이미지 열기 및 시각화
     img_path = os.path.join(opt.data_dir, lang, "img/train", name)
@@ -92,10 +97,11 @@ def unmatched_show(opt, det_data, selected_image: 'str'):
     buf.seek(0)
     plt.close(fig)
     
-    return buf
+    return buf, score_dict, unmatched_len
 
 def main(opt):
-
+    st.set_page_config(layout="wide")
+    
     st.title('결과 시각화😎')
     st.header('Unmatched gt & det bboxes')
     # inference file 불러오기
@@ -105,26 +111,35 @@ def main(opt):
     if 'image_index' not in st.session_state:
         st.session_state.image_index = 0
 
-    # 이미지 탐색 버튼
-    col1, col2 = st.columns([1, 1])
+    # 두 개의 열 생성
+    col1, col2 = st.columns(2)
     with col1:
-        if st.button("Previous"):
-            if st.session_state.image_index > 0:
-                st.session_state.image_index -= 1
+        # 이미지 탐색 버튼
+        search = st.columns(8)
+        with search[0]:
+            if st.button("Previous"):
+                if st.session_state.image_index > 0:
+                    st.session_state.image_index -= 1
+        with search[1]:
+            if st.button("Next"):
+                if st.session_state.image_index < len(image_files) - 1:
+                    st.session_state.image_index += 1
+
+        # Streamlit sidebar: 이미지 선택
+        selected_image = st.selectbox("이미지를 선택하세요:", image_files, index=st.session_state.image_index)
+        if image_files.index(selected_image) != st.session_state.image_index:
+            st.session_state.image_index = image_files.index(selected_image)
+            st.rerun()
+
+        buf, score_dict, unmatched_len = unmatched_show(opt, det_data, selected_image)
+        st.image(buf, width=450)
     with col2:
-        if st.button("Next"):
-            if st.session_state.image_index < len(image_files) - 1:
-                st.session_state.image_index += 1
-
-    # Streamlit sidebar: 이미지 선택
-    selected_image = st.selectbox("이미지를 선택하세요:", image_files, index=st.session_state.image_index)
-
-    if image_files.index(selected_image) != st.session_state.image_index:
-        st.session_state.image_index = image_files.index(selected_image)
-        st.rerun()
-
-    buf = unmatched_show(opt, det_data, selected_image)
-    st.image(buf, width=450)
+        for i in range(8):
+            st.write('\n')
+        st.header('Statistics')
+        st.markdown(f"##### Unmatched gt : {unmatched_len[0]}, Unmatched det : {unmatched_len[1]}")
+        df = pd.DataFrame({"name": score_dict.keys(),"score": score_dict.values()}).set_index('name')
+        st.dataframe(df)
 
 if __name__ == '__main__':
     opt = parse_args()
