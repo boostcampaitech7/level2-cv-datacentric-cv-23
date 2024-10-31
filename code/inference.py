@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from detect import detect
 from deteval import calc_deteval_metrics
+from TIoUeval import calc_tioueval_metrics
 
 
 CHECKPOINT_EXTENSIONS = ['.pth', '.ckpt']
@@ -118,9 +119,16 @@ def main(args):
 
     # Det eval 출력
     results = calc_deteval_metrics(pred_bboxes_dict, gt_bboxes_dict)
+    print('--------------------DetEval------------------------')
     print("Overall Precision:", results['total']['precision'])
     print("Overall Recall:", results['total']['recall'])
     print("Overall Hmean:", results['total']['hmean'])
+
+    results_tiou = calc_tioueval_metrics(pred_bboxes_dict, gt_bboxes_dict)
+    print('---------------------TIoU-----------------------')
+    print("Overall Precision:", results_tiou['total']['precision'])
+    print("Overall Recall:", results_tiou['total']['recall'])
+    print("Overall Hmean:", results_tiou['total']['hmean'])
 
 if __name__ == '__main__':
     args = parse_args()
