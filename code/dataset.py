@@ -374,7 +374,7 @@ class SceneTextDataset(Dataset):
             lang = 'vietnamese'
         else:
             raise ValueError
-        return osp.join(self.root_dir, f'{lang}_receipt', 'img', self.split)
+        return osp.join(self.root_dir, f'{lang}_receipt', 'img', 'train') # 기존 self.split
     def __len__(self):
         return len(self.image_fnames)
 

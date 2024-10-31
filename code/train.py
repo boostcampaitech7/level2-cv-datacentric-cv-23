@@ -47,7 +47,7 @@ def parse_args():
 
 def do_training(data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
                 learning_rate, max_epoch, save_interval):
-    
+
     # wandb config 
     wandb_config = {
         'learning_rate': learning_rate,
@@ -66,18 +66,33 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
     config=wandb_config,
     )
     
-    dataset = SceneTextDataset(
+    train_dataset = SceneTextDataset(
         data_dir,
-        split='train',
+        split='train_random', # 여기서 json 파일 이름 넣어주시면 됩니다
         image_size=image_size,
         crop_size=input_size,
     )
-    dataset = EASTDataset(dataset)
-    num_batches = math.ceil(len(dataset) / batch_size)
+    train_dataset = EASTDataset(train_dataset)
+    num_batches = math.ceil(len(train_dataset) / batch_size)
     train_loader = DataLoader(
-        dataset,
+        train_dataset,
         batch_size=batch_size,
         shuffle=True,
+        num_workers=num_workers
+    )
+
+    # Validation dataset
+    val_dataset = SceneTextDataset(
+        data_dir,
+        split='val_random',
+        image_size=image_size,
+        crop_size=input_size,
+    )
+    val_dataset = EASTDataset(val_dataset)
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
         num_workers=num_workers
     )
 
@@ -139,12 +154,37 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
 
         print('Mean loss: {:.4f} | Elapsed time: {}'.format(
             mean_epoch_loss, timedelta(seconds=time.time() - epoch_start)))
+        
+        if (epoch + 1) % 1 == 0: # 몇 epoch 마다 val 평가
+            val_batches = len(val_loader)
+            with tqdm(total=val_batches) as pbar:
+                pbar.set_description('[Val {}]'.format(epoch + 1))
+                model.eval()
+                val_loss = [0, 0, 0, 0] # total loss, cls loss, angle loss, iou loss
+                with torch.no_grad():
+                    for img, gt_score_map, gt_geo_map, roi_mask, in val_loader:
+                        loss, extra_info = model.train_step(img, gt_score_map, gt_geo_map, roi_mask)
+                        val_loss[0] += loss.item()
+                        val_loss[1] += extra_info['cls_loss']
+                        val_loss[2] += extra_info['angle_loss']
+                        val_loss[3] += extra_info['iou_loss']
+                        pbar.update(1)
+                
+                mean_val_loss = [v / val_batches for v in val_loss]
+                print(
+                    f'Validation Loss after Epoch {epoch + 1}: '
+                    f'Total Loss: {mean_val_loss[0]:.4f}, '
+                    f'Cls Loss: {mean_val_loss[1]:.4f}, '
+                    f'Angle Loss: {mean_val_loss[2]:.4f}, '
+                    f'IoU Loss: {mean_val_loss[3]:.4f}'
+                )
+                model.train()
 
         if (epoch + 1) % save_interval == 0:
             if not osp.exists(model_dir):
                 os.makedirs(model_dir)
 
-            ckpt_fpath = osp.join(model_dir, 'latest.pth')
+            ckpt_fpath = osp.join(model_dir, f'epoch_{epoch + 1}.pth')
             torch.save(model.state_dict(), ckpt_fpath)
             
             # wandb : log model checkpoint 
