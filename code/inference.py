@@ -14,6 +14,8 @@ from detect import detect
 from deteval import calc_deteval_metrics
 from TIoUeval import calc_tioueval_metrics
 
+import pandas as pd
+
 
 CHECKPOINT_EXTENSIONS = ['.pth', '.ckpt']
 LANGUAGE_LIST = ['chinese', 'japanese', 'thai', 'vietnamese']
@@ -93,6 +95,102 @@ def extract_bboxes_dict(json_data):
         bboxes_dict[image_id] = bboxes
     return bboxes_dict
 
+def get_language_json_path(image_name):
+    """이미지 이름에 따른 언어별 JSON 파일 경로 반환"""
+    base_path = args.data_dir
+    if 'zh' in image_name:
+        return os.path.join(base_path, 'chinese_receipt/ufo/val_random.json')
+    elif 'ja' in image_name:
+        return os.path.join(base_path, 'japanese_receipt/ufo/val_random.json')
+    elif 'th' in image_name:
+        return os.path.join(base_path, 'thai_receipt/ufo/val_random.json')
+    elif 'vi' in image_name:
+        return os.path.join(base_path, 'vietnamese_receipt/ufo/val_random.json')
+    return None
+
+def process_data(output_path):
+    """output.csv와 train.json 파일들을 처리하여 태그별 평가 결과 반환"""
+    with open(output_path, 'r', encoding='utf-8') as f:
+        output_data = json.load(f)
+    
+    results = []
+    for image_name, image_data in output_data['images'].items():
+        # 언어 식별
+        lang_code = None
+        if 'zh' in image_name:
+            lang_code = 'chinese'
+        elif 'ja' in image_name:
+            lang_code = 'japanese'
+        elif 'th' in image_name:
+            lang_code = 'thai'
+        elif 'vi' in image_name:
+            lang_code = 'vietnamese'
+        
+        if lang_code:
+            # GT JSON 파일 읽기
+            gt_json_path = get_language_json_path(image_name)
+            if gt_json_path and os.path.exists(gt_json_path):
+                with open(gt_json_path, 'r', encoding='utf-8') as f:
+                    gt_data = json.load(f)
+                
+                # 이미지별 태그 기준으로 bbox 분류
+                gt_tags_bbox = {}
+                if image_name in gt_data['images']:
+                    image_tags = gt_data['images'][image_name].get('tags', [])
+                    if image_tags:
+                        main_tag = image_tags[0]  # 첫 번째 태그 사용
+                        
+                        # 해당 이미지의 모든 bbox를 메인 태그로 분류
+                        gt_boxes = []
+                        for word in gt_data['images'][image_name].get('words', {}).values():
+                            points = word.get('points', [])
+                            if points:
+                                gt_boxes.append(points)
+                        
+                        if gt_boxes:
+                            gt_tags_bbox[main_tag] = gt_boxes
+                
+                # 예측된 bbox
+                pred_bboxes = []
+                for word in image_data.get('words', {}).values():
+                    points = word.get('points', [])
+                    if points:
+                        pred_bboxes.append(points)
+                
+                # 태그별로 평가 수행
+                for tag, gt_boxes in gt_tags_bbox.items():
+                    # DetEval 메트릭 계산
+                    eval_result = calc_deteval_metrics(
+                        {image_name: pred_bboxes},
+                        {image_name: gt_boxes}
+                    )
+                    
+                    results.append({
+                        'language': lang_code,
+                        'tag': tag,
+                        'precision': eval_result['total']['precision'],
+                        'recall': eval_result['total']['recall'],
+                        'hmean': eval_result['total']['hmean']
+                    })
+    
+    return pd.DataFrame(results)
+
+def calculate_tag_scores(df):
+    """태그별 평균 점수 계산"""
+    metrics = ['precision', 'recall', 'hmean']
+    results = {}
+    
+    # 모든 태그에 대해 평균 계산
+    for tag in df['tag'].unique():
+        tag_mask = (df['tag'] == tag)
+        tag_scores = {}
+        for metric in metrics:
+            score = df[tag_mask][metric].mean()
+            tag_scores[metric] = round(float(score), 4) if not pd.isna(score) else 0.0
+        results[tag] = tag_scores
+            
+    return results
+
 def main(args):
     # Initialize model
     model = EAST(pretrained=False).to(args.device)
@@ -124,11 +222,25 @@ def main(args):
     print("Overall Recall:", results['total']['recall'])
     print("Overall Hmean:", results['total']['hmean'])
 
+
+    # 태그별 평가 결과 계산
+    output_df = process_data(osp.join(args.output_dir, output_fname))
+    scores = calculate_tag_scores(output_df)
+
+    # 결과 출력
+    for tag, metrics in scores.items():
+        print(f"\n{tag} 평가 결과:")
+        print(f"  Precision: {metrics['precision']:.4f}")
+        print(f"  Recall: {metrics['recall']:.4f}")
+        print(f"  F1-score: {metrics['hmean']:.4f}")
+
+
     results_tiou = calc_tioueval_metrics(pred_bboxes_dict, gt_bboxes_dict)
     print('---------------------TIoU-----------------------')
     print("Overall Precision:", results_tiou['total']['precision'])
     print("Overall Recall:", results_tiou['total']['recall'])
     print("Overall Hmean:", results_tiou['total']['hmean'])
+
 
 if __name__ == '__main__':
     args = parse_args()
