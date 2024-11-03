@@ -34,8 +34,12 @@ def parse_args():
     parser.add_argument('--input_size', type=int, default=1024)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--max_epoch', type=int, default=150)
-    parser.add_argument('--save_interval', type=int, default=5)
+    parser.add_argument('--max_epoch', type=int, default=1)
+    parser.add_argument('--save_interval', type=int, default=1)
+    
+    # 사전학습된 모델 파일을 사용할 경우 : --pretrained 를 True로 설정해주세요.
+    parser.add_argument('--pretrained', type=bool, default=False)
+    parser.add_argument('--pretrained_path', type=str, default='trained_models/epoch_30.pth')
     
     args = parser.parse_args()
 
@@ -46,7 +50,8 @@ def parse_args():
 
 
 def do_training(data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
-                learning_rate, max_epoch, save_interval):
+                learning_rate, max_epoch, save_interval, 
+                pretrained, pretrained_path):
 
     # wandb config 
     wandb_config = {
@@ -58,13 +63,39 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
     
     # wandb run : name, notes, tags -> 실험 시 수정 
     run = wandb.init(
-    project="lv2-OCR",
-    entity="cv23-lv2-ocr",
-    name="baseline_added_validation",
-    notes="baseline experiment with validation",
-    tags=["baseline", "validation meteric"],
-    config=wandb_config,
+        project="lv2-OCR",
+        entity="cv23-lv2-ocr",
+        name="expriment_wandb_artifact2",
+        notes="experiment using wandb artifact",
+        tags=["wandb", "artifact"],
+        config=wandb_config,
     )
+    
+    # wandb : dataset json 파일 artifact에 추가 
+    dataset_artifact = wandb.Artifact(
+        name="dataset_annotation",
+        type="dataset",
+        description="Dataset annotation for training"
+    )
+    
+    annotation_files = [
+        'train_random.json',
+        'val_random.json'
+    ]
+    
+    # 각 언어 폴더에서 annotation 파일 추가
+    languages = ['chinese_receipt', 'japanese_receipt', 'thai_receipt', 'vietnamese_receipt']
+    
+    for lang in languages:
+        ufo_dir = os.path.join(data_dir, lang, 'ufo')
+        if os.path.exists(ufo_dir):
+            for annotation_file in annotation_files:
+                file_path = os.path.join(ufo_dir, annotation_file)
+                if os.path.exists(file_path):
+                    dataset_artifact.add_file(file_path, name=f"{lang}/ufo/{annotation_file}")
+    
+    # artifact 로깅
+    wandb.log_artifact(dataset_artifact)
     
     train_dataset = SceneTextDataset(
         data_dir,
@@ -98,6 +129,15 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = EAST()
+    
+    if pretrained:
+        if osp.exists(pretrained_path):
+            pretrained_weights = torch.load(pretrained_path, map_location=device)
+            model.load_state_dict(pretrained_weights, strict=False)
+            print('사전학습된 가중치를 성공적으로 불러왔습니다.')
+        else:
+            print('사전학습된 가중치 파일을 찾을 수 없습니다.')
+    
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 2], gamma=0.1)
@@ -198,7 +238,14 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
             
             # wandb : log model checkpoint 
             wandb.save(ckpt_fpath)
-            
+            # wandb artifact로도 저장
+            artifact = wandb.Artifact(
+                name=f"model-{run.id}", 
+                type="model",
+                description=f"Model checkpoint from epoch {epoch + 1}"
+            )
+            artifact.add_file(ckpt_fpath)
+            wandb.log_artifact(artifact)
     wandb.finish()
 
 

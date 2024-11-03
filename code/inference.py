@@ -15,7 +15,7 @@ from deteval import calc_deteval_metrics
 from TIoUeval import calc_tioueval_metrics
 
 import pandas as pd
-
+import wandb
 
 CHECKPOINT_EXTENSIONS = ['.pth', '.ckpt']
 LANGUAGE_LIST = ['chinese', 'japanese', 'thai', 'vietnamese']
@@ -34,6 +34,8 @@ def parse_args():
 
     parser.add_argument('--json_name', type=str, default='val_random')
     parser.add_argument('--img_dir', type=str, default='train')
+    
+    parser.add_argument('--run_id', type=str, default='')
 
     args = parser.parse_args()
 
@@ -192,11 +194,12 @@ def calculate_tag_scores(df):
     return results
 
 def main(args):
+    
     # Initialize model
     model = EAST(pretrained=False).to(args.device)
 
     # Get paths to checkpoint files
-    ckpt_fpath = osp.join(args.model_dir, 'latest.pth')
+    ckpt_fpath = osp.join(args.model_dir, 'epoch_30.pth')
 
     if not osp.exists(args.output_dir):
         os.makedirs(args.output_dir)
@@ -240,6 +243,23 @@ def main(args):
     print("Overall Precision:", results_tiou['total']['precision'])
     print("Overall Recall:", results_tiou['total']['recall'])
     print("Overall Hmean:", results_tiou['total']['hmean'])
+    
+    # run_id가 있으면 wandb에 로그 저장 : run_id는 wandb UI에서 overview 탭에서 확인할 수 있어요.
+    if args.run_id:
+        wandb.init(project='lv2-OCR',
+                   entity='cv23-lv2-ocr',
+                   id=args.run_id,
+                   resume="must")
+        wandb.log({
+            'eval/tiou_precision': results_tiou['total']['precision'],
+            'eval/tiou_recall': results_tiou['total']['recall'],
+            'eval/tiou_hmean': results_tiou['total']['hmean'],
+            'eval/deteval_precision': results['total']['precision'],
+            'eval/deteval_recall': results['total']['recall'],
+            'eval/deteval_hmean': results['total']['hmean']
+        })
+        wandb.finish()
+        
 
 
 if __name__ == '__main__':
