@@ -119,9 +119,14 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                 loss_val = loss.item()
                 epoch_loss += loss_val
                 
-                cls_loss_sum += extra_info['cls_loss']
-                angle_loss_sum += extra_info['angle_loss']
-                iou_loss_sum += extra_info['iou_loss']
+
+                cls_loss = extra_info.get('cls_loss', 0)
+                angle_loss = extra_info.get('angle_loss', 0)
+                iou_loss = extra_info.get('iou_loss', 0)
+                
+                cls_loss_sum += cls_loss if cls_loss is not None else 0
+                angle_loss_sum += angle_loss if angle_loss is not None else 0
+                iou_loss_sum += iou_loss if iou_loss is not None else 0
                 
                 # wandb log batch metrics
                 wandb.log({
@@ -130,8 +135,9 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
 
                 pbar.update(1)
                 val_dict = {
-                    'Cls loss': extra_info['cls_loss'], 'Angle loss': extra_info['angle_loss'],
-                    'IoU loss': extra_info['iou_loss']
+                    'Cls loss': cls_loss if cls_loss is not None else 0, 
+                    'Angle loss': angle_loss if angle_loss is not None else 0,
+                    'IoU loss': iou_loss if iou_loss is not None else 0
                 }
                 pbar.set_postfix(val_dict)
 
@@ -165,9 +171,16 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                     for img, gt_score_map, gt_geo_map, roi_mask, in val_loader:
                         loss, extra_info = model.train_step(img, gt_score_map, gt_geo_map, roi_mask)
                         val_loss[0] += loss.item()
-                        val_loss[1] += extra_info['cls_loss']
-                        val_loss[2] += extra_info['angle_loss']
-                        val_loss[3] += extra_info['iou_loss']
+                        
+                        # None 체크 추가
+                        cls_loss = extra_info.get('cls_loss', 0)
+                        angle_loss = extra_info.get('angle_loss', 0)
+                        iou_loss = extra_info.get('iou_loss', 0)
+                        
+                        val_loss[1] += cls_loss if cls_loss is not None else 0
+                        val_loss[2] += angle_loss if angle_loss is not None else 0
+                        val_loss[3] += iou_loss if iou_loss is not None else 0
+                        
                         pbar.update(1)
                 
                 mean_val_loss = [v / val_batches for v in val_loss]
