@@ -15,7 +15,7 @@ from deteval import calc_deteval_metrics
 from TIoUeval import calc_tioueval_metrics
 
 import pandas as pd
-import wandb
+
 
 CHECKPOINT_EXTENSIONS = ['.pth', '.ckpt']
 LANGUAGE_LIST = ['chinese', 'japanese', 'thai', 'vietnamese']
@@ -34,8 +34,6 @@ def parse_args():
 
     parser.add_argument('--json_name', type=str, default='val_random')
     parser.add_argument('--img_dir', type=str, default='train')
-    
-    parser.add_argument('--run_id', type=str, default='')
 
     args = parser.parse_args()
 
@@ -108,8 +106,6 @@ def get_language_json_path(image_name):
         return os.path.join(base_path, 'thai_receipt/ufo/val_random.json')
     elif 'vi' in image_name:
         return os.path.join(base_path, 'vietnamese_receipt/ufo/val_random.json')
-    elif 'cord' in image_name:
-        return os.path.join(base_path, 'cord_receipt/ufo/val_random.json')
     return None
 
 def process_data(output_path):
@@ -129,8 +125,6 @@ def process_data(output_path):
             lang_code = 'thai'
         elif 'vi' in image_name:
             lang_code = 'vietnamese'
-        elif 'cord' in image_name:
-            lang_code = 'cord'
         
         if lang_code:
             # GT JSON 파일 읽기
@@ -198,12 +192,11 @@ def calculate_tag_scores(df):
     return results
 
 def main(args):
-    
     # Initialize model
     model = EAST(pretrained=False).to(args.device)
 
     # Get paths to checkpoint files
-    ckpt_fpath = osp.join(args.model_dir, 'epoch_30.pth')
+    ckpt_fpath = osp.join(args.model_dir, 'jh_data_cv2.pth')
 
     if not osp.exists(args.output_dir):
         os.makedirs(args.output_dir)
@@ -212,58 +205,42 @@ def main(args):
 
     ufo_result = dict(images=dict())
     split_result, gt_bboxes_dict = do_inference(model, ckpt_fpath, args.data_dir, args.input_size,
-                                args.batch_size, split='train')
+                                args.batch_size, split=args.img_dir)
     ufo_result['images'].update(split_result['images'])
 
     # 예측 바운딩 박스 딕셔너리 생성
     pred_bboxes_dict = extract_bboxes_dict(ufo_result)
 
-    output_fname = 'output.csv'
+    output_fname = 'jh_data_cv2.csv'
     with open(osp.join(args.output_dir, output_fname), 'w') as f:
         json.dump(ufo_result, f, indent=4)
 
-    # Det eval 출력
-    results = calc_deteval_metrics(pred_bboxes_dict, gt_bboxes_dict)
-    print('--------------------DetEval------------------------')
-    print("Overall Precision:", results['total']['precision'])
-    print("Overall Recall:", results['total']['recall'])
-    print("Overall Hmean:", results['total']['hmean'])
+    if args.img_dir != 'test':
+        # Det eval 출력
+        results = calc_deteval_metrics(pred_bboxes_dict, gt_bboxes_dict)
+        print('--------------------DetEval------------------------')
+        print("Overall Precision:", results['total']['precision'])
+        print("Overall Recall:", results['total']['recall'])
+        print("Overall Hmean:", results['total']['hmean'])
 
 
-    # 태그별 평가 결과 계산
-    output_df = process_data(osp.join(args.output_dir, output_fname))
-    scores = calculate_tag_scores(output_df)
+        # 태그별 평가 결과 계산
+        output_df = process_data(osp.join(args.output_dir, output_fname))
+        scores = calculate_tag_scores(output_df)
 
-    # 결과 출력
-    for tag, metrics in scores.items():
-        print(f"\n{tag} 평가 결과:")
-        print(f"  Precision: {metrics['precision']:.4f}")
-        print(f"  Recall: {metrics['recall']:.4f}")
-        print(f"  F1-score: {metrics['hmean']:.4f}")
+        # 결과 출력
+        for tag, metrics in scores.items():
+            print(f"\n{tag} 평가 결과:")
+            print(f"  Precision: {metrics['precision']:.4f}")
+            print(f"  Recall: {metrics['recall']:.4f}")
+            print(f"  F1-score: {metrics['hmean']:.4f}")
 
 
-    results_tiou = calc_tioueval_metrics(pred_bboxes_dict, gt_bboxes_dict)
-    print('---------------------TIoU-----------------------')
-    print("Overall Precision:", results_tiou['total']['precision'])
-    print("Overall Recall:", results_tiou['total']['recall'])
-    print("Overall Hmean:", results_tiou['total']['hmean'])
-    
-    # run_id가 있으면 wandb에 로그 저장 : run_id는 wandb UI에서 overview 탭에서 확인할 수 있어요.
-    if args.run_id:
-        wandb.init(project='lv2-OCR',
-                   entity='cv23-lv2-ocr',
-                   id=args.run_id,
-                   resume="must")
-        wandb.log({
-            'eval/tiou_precision': results_tiou['total']['precision'],
-            'eval/tiou_recall': results_tiou['total']['recall'],
-            'eval/tiou_hmean': results_tiou['total']['hmean'],
-            'eval/deteval_precision': results['total']['precision'],
-            'eval/deteval_recall': results['total']['recall'],
-            'eval/deteval_hmean': results['total']['hmean']
-        })
-        wandb.finish()
-        
+        results_tiou = calc_tioueval_metrics(pred_bboxes_dict, gt_bboxes_dict)
+        print('---------------------TIoU-----------------------')
+        print("Overall Precision:", results_tiou['total']['precision'])
+        print("Overall Recall:", results_tiou['total']['recall'])
+        print("Overall Hmean:", results_tiou['total']['hmean'])
 
 
 if __name__ == '__main__':
