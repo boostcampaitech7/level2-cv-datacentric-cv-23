@@ -336,6 +336,7 @@ def filter_vertices(vertices, labels, ignore_under=0, drop_under=0):
 
 class SceneTextDataset(Dataset):
     def __init__(self, root_dir,
+                 lang_list,
                  split='train',
                  image_size=2048,
                  crop_size=1024,
@@ -343,7 +344,7 @@ class SceneTextDataset(Dataset):
                  drop_under_threshold=1,
                  color_jitter=True,
                  normalize=True):
-        self._lang_list = ['chinese', 'japanese', 'thai', 'vietnamese','cord']
+        self._lang_list = lang_list
         self.root_dir = root_dir
         self.split = split
         total_anno = dict(images=dict())
@@ -374,6 +375,8 @@ class SceneTextDataset(Dataset):
             lang = 'vietnamese'
         elif lang_indicator == 'cord':
             lang = 'cord'
+        elif lang_indicator == 'sroie':
+            lang = 'sroie'
         else:
             raise ValueError
         return osp.join(self.root_dir, f'{lang}_receipt', 'img', 'train') # 기존 self.split

@@ -84,21 +84,22 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
     ]
     
     # 각 언어 폴더에서 annotation 파일 추가
-    languages = ['chinese_receipt', 'japanese_receipt', 'thai_receipt', 'vietnamese_receipt']
+    languages = ['chinese', 'japanese', 'thai', 'vietnamese']
     
     for lang in languages:
-        ufo_dir = os.path.join(data_dir, lang, 'ufo')
+        ufo_dir = os.path.join(data_dir, f'{lang}_receipt', 'ufo')
         if os.path.exists(ufo_dir):
             for annotation_file in annotation_files:
                 file_path = os.path.join(ufo_dir, annotation_file)
                 if os.path.exists(file_path):
-                    dataset_artifact.add_file(file_path, name=f"{lang}/ufo/{annotation_file}")
+                    dataset_artifact.add_file(file_path, name=f"{lang}_receipt/ufo/{annotation_file}")
     
     # artifact 로깅
     wandb.log_artifact(dataset_artifact)
     
     train_dataset = SceneTextDataset(
         data_dir,
+        lang_list=['chinese', 'japanese', 'thai', 'vietnamese', 'cord', 'sroie'],
         split='train_random', # 여기서 json 파일 이름 넣어주시면 됩니다
         image_size=image_size,
         crop_size=input_size,
@@ -115,6 +116,7 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
     # Validation dataset
     val_dataset = SceneTextDataset(
         data_dir,
+        lang_list=['chinese', 'japanese', 'thai', 'vietnamese'],
         split='val_random',
         image_size=image_size,
         crop_size=input_size,
