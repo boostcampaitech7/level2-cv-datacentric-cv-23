@@ -106,6 +106,8 @@ def get_language_json_path(image_name):
         return os.path.join(base_path, 'thai_receipt/ufo/val_random.json')
     elif 'vi' in image_name:
         return os.path.join(base_path, 'vietnamese_receipt/ufo/val_random.json')
+    elif 'cord' in image_name:
+        return os.path.join(base_path, 'cord_receipt/ufo/val_random.json')
     return None
 
 def process_data(output_path):
@@ -125,6 +127,8 @@ def process_data(output_path):
             lang_code = 'thai'
         elif 'vi' in image_name:
             lang_code = 'vietnamese'
+        elif 'cord' in image_name:
+            lang_code = 'cord'
         
         if lang_code:
             # GT JSON 파일 읽기
