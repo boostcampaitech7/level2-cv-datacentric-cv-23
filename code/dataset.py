@@ -416,6 +416,9 @@ class SceneTextDataset(Dataset):
         funcs = []
         if self.color_jitter:
             funcs.append(A.ColorJitter())
+        funcs.append(A.MotionBlur(blur_limit=7, p=0.5))
+        funcs.append(A.GaussianBlur(blur_limit=(3, 11)))
+        funcs.append(A.MultiplicativeNoise(multiplier=(0.8, 1.2)))
         if self.normalize:
             funcs.append(A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
         transform = A.Compose(funcs)
