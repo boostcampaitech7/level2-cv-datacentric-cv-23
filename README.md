@@ -124,41 +124,96 @@ data/
 
 ### Train & Test json
 
-Train json 파일은 coco format을 따르며 Info, licenses, images, categories, annotations로 구성되어 있습니다.
-- Images
-  ```json
-    "images": [
-    {
-      "width": 1024,
-      "height": 1024,
-      "file_name": "train/0000.jpg",
-      "license": 0,
-      "flickr_url": null,
-      "coco_url": null,
-      "date_captured": "2020-12-26 14:44:23",
-      "id": 0
-    },
-    ...
-  ```
-- Annotation
-  ```json
-      "annotations": [
-    {
-      "image_id": 0,
-      "category_id": 0,
-      "area": 257301.66,
-      "bbox": [
-        197.6,
-        193.7,
-        547.8,
-        469.7
-      ],
-      "iscrowd": 0,
-      "id": 0
-    },
-    ...
-  ```
-- Test JSON 파일은 Train JSON 파일과 동일한 구조를 가지며, 단 Annotation 정보만 빠져 있습니다.
+Train json 파일은 UFO format을 따르며 paragraphs, words, characters, image width & height, image tag, annotation log, license tag 등으로 구성되어 있습니다.
+
+```json
+{
+    "images": {
+        "extractor.ja.in_house.appen_000911_page0001.jpg": {
+            "paragraphs": {},
+            "words": {
+                "0001": {
+                    "transcription": "LAWSON",
+                    "points": [
+                        [
+                            728.553329490908,
+                            235.436074339687
+                        ],
+                        [
+                            735.9530472990916,
+                            428.81846937705836
+                        ],
+                        [
+                            216.57843990309,
+                            340.653026763541
+                        ],
+                        [
+                            220.926247854489,
+                            246.740375013324
+                        ]
+                    ]
+                },
+                "chars": {},
+                "img_w": 960,
+                "img_h": 1280,
+                "num_patches": null,
+                "tags": [],
+                "relations": {},
+                "annotation_log": {
+                    "worker": "worker",
+                    "timestamp": "2024-06-07",
+                    "tool_version": "",
+                    "source": null
+                },
+                "license_tag": {
+                    "usability": true,
+                    "public": false,
+                    "commercial": true,
+                    "type": null,
+                    "holder": "Upstage"
+                }
+            }
+        },
+        ...
+    }
+```
+- point는 각 라벨의 위치 좌표이며, 글자를 읽는 방향의 왼쪽 위에서부터 시계 방향으로 x,y 좌표로 총 4개의 (x,y) 좌표로 구성되어 있습니다.
+
+
+Test JSON 파일은 Train JSON 파일과 동일한 구조를 가지며, 단 point 정보만 빠져 있습니다.
+
+<br />
+
+## 🎉 Project
+
+### 1. Structure
+```bash
+project
+├── code
+│   ├── artifacts_download.py
+│   ├── bbox_check.py
+│   ├── dataset_CV2.py
+│   ├── dataset.py
+│   ├── deteval.py
+│   ├── inference.py
+│   ├── inference.sh
+│   ├── requirements.txt
+│   ├── result_viz.py
+│   ├── result_viz.sh
+│   ├── TIoUeval.py
+│   └── train.py
+├── notebooks
+│   ├── CORD2UFO.ipynb
+│   ├── eda.ipynb
+│   └── SROIE2UFO.ipynb
+└── util
+    ├── COCO2UFO.py
+    ├── create_train_val_tag.py
+    ├── create_val_data.py
+    └── UFO2COCO.py
+```
+- 
+
 <br />
 
 ## ⚙️ Requirements
@@ -169,113 +224,12 @@ Train json 파일은 coco format을 따르며 Info, licenses, images, categories
 ### Installment
 또한, 이 프로젝트에는 다앙한 라이브러리가 필요합니다. 다음 단계를 따라 필요한 모든 라이브러리를 설치할 수 있습니다.
 ``` bash
-  git clone https://github.com/boostcampaitech7/level2-objectdetection-cv-23.git
-  cd level2-objectdetection-cv-23
+  git clone https://github.com/boostcampaitech7/level2-cv-datacentric-cv-23.git
+  cd level2-datacentric-cv-23
   pip install -r requirements.txt
 ```
 
 <br />
-
-## 🎉 Project
-
-### 1. Structure
-  ```bash
-project
-├── Detectron2
-│   ├── detectron2_inference.py
-│   └── detectron2_train.py
-├── EDA
-│   ├── confusion_matrix_trash.py
-│   └── Stramlit
-│       ├── arial.ttf
-│       ├── EDA_Streamlit.py
-│       ├── EDA_Streamlit.sh
-│       ├── inference_json
-│       │   └── val_split_rand411_pred_latest.json
-│       └── validation_json
-│           └── val_split_random411.json
-├── mmdetection2
-│   ├── mmdetection2_inference.py
-│   ├── mmdetection2_train.py
-│   └── mmdetection2_val.py
-├── mmdetection3
-│   ├── mmdetectionV3_inference.py
-│   ├── mmdetectionV3_train.py
-│   └── mmdetectionV3_val.py
-├── README.md
-├── requirements.txt
-└── src
-    ├── ensemble.py
-    └── make_val_dataset.ipynb
-```
-### 2. EDA
-#### 2-1. Streamlit
-Train data 및 inference 결과의 EDA을 위해 Streamlit을 활용했습니다. Streamlit을 통해 EDA를 진행하기 위해 다음을 실행하세요.
-```bash
-bash EDA_Streamlit.sh
-```
-실행을 위해 다음의 인자가 필요합니다.
-
-  - **dataset_path** : dataset 경로
-  - **font_path** : bbox의 시각화를 위한 font 경로 (우리의 Repository에 있는 arial.ttf을 이용하세요)
-  - **inference_path** : inference json 파일 경로
-  - **validation_path** : validation json 파일 경로
-  
-데모 실행을 위해 validation_json, inference_json directory에 데모 json 파일이 있습니다.
-
-#### 2-2. confusion_matrix
-Confusion matrix를 시각화하기 위해 confusion_matrix_trash.py 코드를 추가하였습니다.
-
-해당 코드는 validation inference 시 confusion matrix도 함께 출력하기 위한 코드로 직접 실행하지 않고 val.py에서 import해 사용합니다. mmdetectionv2_val.py에서 confusion matrix를 출력하는 코드를 확인하실 수 있습니다.
-
-mmdetectionv2_val.py를 실행하면 추론 결과를 담은 json 파일, confusion_matrix를 위한 pickel파일, confusion_matrix png파일이 함께 저장됩니다.
-        
-### 3. Train and inference
-프로젝트를 위해 mmdetection V2 및 V3, Detectron2를 사용했습니다. 각 라이브러리에 해당하는 directory에 train과 inference를 위한 코드가 있습니다.
-
-해당 코드들을 사용하기 위해 mmdetection 및 Detectron2 라이브러리에 포함된 config 파일이 필요합니다. 밑의 링크들을 통해 config 파일과 그에 필요한 구성 요소들을 clone할 수 있습니다.
-  
-- [mmdetection](https://github.com/open-mmlab/mmdetection) 
-- [Detectron2](https://github.com/facebookresearch/detectron2)
-
-[라이브러리명]_val.py 파일은 Streamlit 시각화를 위해 validation inference 결과에 대한 json 파일을 추출하는 코드입니다. Detectron2의 경우 detectron2_inference.py를 통해 json 파일을 추출할 수 있습니다. 
-<br />
-
-### 4. ensemble
-앙상블을 사용하기 위해 다음을 실행하세요.
-```bash
-python ./src/ensemble.py
-```
-
-아래 변수 값을 수정하여 csv 파일 및 json 저장경로를 지정할 수 있습니다.
-```python
-root = ['*.csv',] # 앙상블을 진행할 csv 파일을 지정합니다.
-submission_dir = '../../submission/' # csv 파일이 저장된 경로 및 앙상블 후 저장할 경로를 지정합니다.
-annotation = '../../dataset/test.json' # 앙상블에 사용하기 위해 file의 image 정보가 포함된 json 파일 경로를 지정합니다.
-```
-
-아래 변수 값을 수정하여 앙상블 기법 및 수치를 지정할 수 있습니다.
-```python
-ensemble_type = '' #[nms, wbf, nmw, soft-nms] 중 사용할 앙상블 기법을 선택합니다. 
-iou_thr = 0.5 #iou threshold 값을 설정합니다.
-
-# WBF 기법 설정 값
-wbf_conf_type='avg' # ['avg', 'max', 'box_and_model_avg', 'absent_model_aware_avg'] # WBF 기법 수행 시 신뢰도 계산 방법을 설정 값입니다.
-wbf_allows_overflow = False # {True: 가중치 합 > 1, False: 가중치 합 1로 고정} # 가중치 합을 1을 초과하거나 1로 고정 하는 설정 값입니다.
-wbf_skip_box_thr = 0.0 # 값에 해당하는 정확도가 넘지 않으면 제외하는 설정 값입니다.
-
-# Soft-NMS 기법 설정 값
-method = 2 # 1 - linear soft-NMS, 2 - gaussian soft-NMS, 3 - standard NMS 기본값: 2  # Soft-NMS의 방식을 선택하는 설정 값입니다.
-sn_sigma = 0.5 # Gaussian soft-NMS 방식 사용 시 분산을 설정하는 값입니다. 
-sn_thresh = 0.001 # 값에 해당하는 신뢰도 미만의 Box를 제거하는 설정 값입니다.
-
-
-weights = [1] * len(submission_df) # 각 모델의 동일한 가중치 1을 고정하는 설정 값입니다. None으로 설정 시 각 모델에 적용된 가중치로 진행됩니다. 
-
-```
-
-해당 코드들은 Weighted-Boxes-Fusion GitHub 내 ensemble_boxes 라이브러리가 포함되어 있습니다.
-- [Weighted-Boxes-Fusion](https://github.com/ZFTurbo/Weighted-Boxes-Fusion)  
 
 ## 🧑‍🤝‍🧑 Contributors
 <div align="center">
