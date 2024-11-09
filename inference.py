@@ -12,8 +12,7 @@ from model import EAST
 from tqdm import tqdm
 
 from detect import detect
-from deteval import calc_deteval_metrics
-from TIoUeval import calc_tioueval_metrics
+from src import calc_deteval_metrics, calc_tioueval_metrics
 
 import pandas as pd
 
