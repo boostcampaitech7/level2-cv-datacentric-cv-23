@@ -18,12 +18,6 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-
-def read_json(filename: str):
-    with Path(filename).open(encoding='utf8') as handle:
-        ann = json.load(handle)
-    return ann
-
 language_dict = {
     'zh': 'chinese',
     'ja': 'japanese',
@@ -31,18 +25,21 @@ language_dict = {
     'vi': 'vietnamese',
 }
 
-def get_bboxes_dict(data):
+def read_json(filename: str):
+    with Path(filename).open(encoding='utf8') as handle:
+        annotation = json.load(handle)
+    return annotation
+
+def get_bboxes_dict(data, name):
     bboxes_dict = dict()
-    for name, info in data['images'].items():
-        bboxes_dict[name] = [point['points'] for point in info['words'].values()]
+    info = data['images'][name]
+    bboxes_dict[name] = [bbox['points'] for bbox in info['words'].values()]
     return bboxes_dict
-
-
 
 def get_matched_id(pairs):
     
     gt_matched_id = []
-    det_matched_id = []
+    pred_matched_id = []
     for pair in pairs:
         if isinstance(pair['gt'], list):
             for gt_num in pair['gt']:
@@ -50,11 +47,11 @@ def get_matched_id(pairs):
         else: gt_matched_id.append(pair['gt'])
 
         if isinstance(pair['det'], list):
-            for det_num in pair['det']:
-                det_matched_id.append(det_num)
-        else: det_matched_id.append(pair['det'])
+            for pred_num in pair['det']:
+                pred_matched_id.append(pred_num)
+        else: pred_matched_id.append(pair['det'])
     
-    return gt_matched_id, det_matched_id
+    return gt_matched_id, pred_matched_id
 
 def get_buf_of_fig(img_path, gt_bboxes, pred_bboxes):
 
@@ -81,31 +78,32 @@ def get_buf_of_fig(img_path, gt_bboxes, pred_bboxes):
 
     return buf
 
-def get_result(opt, pred_data, selected_image: 'str'):
+def get_result(opt, pred_data, name: 'str'):
 
-    name = selected_image
     lang = language_dict[name.split('.')[1]]
     gt_data = read_json(f'{opt.data_dir}/{lang}_receipt/ufo/train.json')
 
     # Pred와 GT bounding box 추출
-    pred_bboxes_dict = get_bboxes_dict(pred_data)
-    gt_bboxes_dict = get_bboxes_dict(gt_data)
+    gt_bboxes_dict = get_bboxes_dict(gt_data, name)
+    pred_bboxes_dict = get_bboxes_dict(pred_data, name)
 
     # deteval 계산
     resdict = calc_deteval_metrics(pred_bboxes_dict, gt_bboxes_dict)
 
+    # resdict에서 필요한 정보 추출
     resdict_sample = resdict['per_sample'][name]
     score_dict = {score: resdict_sample[score] for score in ['precision', 'recall', 'hmean']}
     pairs = resdict_sample['pairs']
 
     gt_matched_id, pred_matched_id = get_matched_id(pairs)
     
-    # 매칭된 GT와 Pred bounding box 추출
+    # 매칭된 GT와 Pred bounding box
     gt_matched = [gt_bboxes_dict[name][id] for id in gt_matched_id]
     pred_matched = [pred_bboxes_dict[name][id] for id in pred_matched_id]
     matched_len = [len(gt_matched), len(pred_matched)]
 
-    # 매칭되지 않은 GT와 Pred bounding box 추출
+
+    # 매칭되지 않은 GT와 Pred bounding box
     gt_unmatched = [gt_bboxes_dict[name][i] for i in range(len(gt_bboxes_dict[name])) if i not in gt_matched_id]
     pred_unmatched = [pred_bboxes_dict[name][i] for i in range(len(pred_bboxes_dict[name])) if i not in pred_matched_id]
     unmatched_len = [len(gt_unmatched), len(pred_unmatched)]
@@ -131,7 +129,7 @@ def main(opt):
     if 'image_index' not in st.session_state:
         st.session_state.image_index = 0
 
-    # 두 개의 열 생성
+    # 세 개의 열 생성
     col1, col2, col3 = st.columns(3)
 
     with col2:
@@ -153,7 +151,7 @@ def main(opt):
         if image_files.index(selected_image) != st.session_state.image_index:
             st.session_state.image_index = image_files.index(selected_image)
             st.rerun()
-        # unmatched box 이미지 출력
+        # matched, unmatched box 이미지 출력
         matched, unmatched, score_dict = get_result(opt, pred_data, selected_image)
         st.text('Matched')
         st.image(matched[0], width=450)
