@@ -274,4 +274,4 @@ project
 </div>
 
 ## ⚡️ Detail   
-프로젝트에 대한 자세한 내용은 [Wrap-Up Report](https://github.com/boostcampaitech7/level2-objectdetection-cv-23/blob/main/docs/CV_23_WrapUp_Report_detection.pdf) 에서 확인할 수 있습니다.
+프로젝트에 대한 자세한 내용은 [Wrap-Up Report](https://github.com/boostcampaitech7/level2-cv-datacentric-cv-23/blob/main/docs/Data-Centric_CV_%ED%8C%80%20%EB%A6%AC%ED%8F%AC%ED%8A%B8(23%EC%A1%B0).pdf) 에서 확인할 수 있습니다.
