@@ -12,14 +12,14 @@
     </picture>
     <div align="center">
         <img src="https://github.com/user-attachments/assets/eaeefa98-f5b7-4be0-bd7c-723e22380b6f" width="600"/>
-        <text>이미지 출처 : https://www.ncloud.com/product/aiService/ocr</text>
+        <text> 이미지 출처 : https://www.ncloud.com/product/aiService/ocr</text>
     </div>
 </p>
 
 <br />
 
 ## ✏️ Introduction
-OCR ­(Optical Character Recognition)은 문서 등의 이미지에서 글자를 인식하는 Task 입니다. OCR의 모듈로는 글자 영역을 판단하는 Text Detector, 영역에 포함된 글자를 인식하는 Text Recognizer, 자연어를 유의미한 순서로 정렬하는 Serialiser, 기정의된 key들에 대한 value 추출하는 Text Parser가 있습니다. 해당 대회는 영수증 이미지 데이터에서 글자를 검출하는 OCR 대회로 다음 두 가지 규칙이 있습니다.
+OCR ­(Optical Character Recognition)은 문서 등의 이미지에서 글자를 인식하는 Task 입니다. OCR의 모듈로는 글자 영역을 판단하는 Text Detector, 영역에 포함된 글자를 인식하는 Text Recognizer, 자연어를 유의미한 순서로 정렬하는 Serializer, 기정의된 key들에 대한 value 추출하는 Text Parser가 있습니다. 해당 대회는 영수증 이미지 데이터에서 글자를 검출하는 OCR 대회로 다음 두 가지 규칙이 있습니다.
 
 1. 영수증 이미지에서 영역을 탐지하는 Text Detection만을 수행합니다.
 2. 모델은 EAST로 고정하고, Data만을 수정하여 성능을 높여야 합니다.
